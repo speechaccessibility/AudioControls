@@ -1,27 +1,27 @@
 /*
-	MIT License
+ MIT License
 
-	Copyright (c) 2022 The Speech Accessibility Project,
-	              The Beckman Institute,
-	              University of Illinois, Urbana-Champaign
+ Copyright (c) 2022 The Speech Accessibility Project,
+ The Beckman Institute,
+ University of Illinois, Urbana-Champaign
 
-	Permission is hereby granted, free of charge, to any person obtaining a copy
-	of this software and associated documentation files (the "Software"), to deal
-	in the Software without restriction, including without limitation the rights
-	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-	copies of the Software, and to permit persons to whom the Software is
-	furnished to do so, subject to the following conditions:
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
 
-	The above copyright notice and this permission notice shall be included in all
-	copies or substantial portions of the Software.
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
 
-	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-	SOFTWARE.
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
  */
 
 export class AudioControls {
@@ -35,16 +35,17 @@ export class AudioControls {
 	private readonly playStopButtonId: string;
 	private readonly recordStartButtonId: string;
 	private readonly recordStopButtonId: string;
-	private readonly waveformBackgroundCSS: string;
-	private readonly waveformCanvasId: string;
-	private readonly waveformForegroundCSS: string;
 
-	private readonly maxRecordingTimeMsec: number;
-	private readonly recordingSampleRateMsec: number;
+	private readonly waveformCanvasId: string;
+	private readonly waveformBackgroundCSS: string = 'black'
+	private readonly waveformForegroundCSS: string = 'white'
+
+	private readonly maxRecordingTimeMsec: number = 60000
+	private readonly recordingSampleRateMsec: number = 100
 
 	availableInputDevices: MediaDeviceInfo[] = [];
 
-	private recordingTimeExceededId: number;
+	private recordingTimeExceededId: NodeJS.Timeout;
 	private isRecording: boolean = false
 	private isPlaying: boolean = false
 
@@ -93,8 +94,10 @@ export class AudioControls {
 	 *                  "black", etc. Default is "white".
 	 *  @param {number?} maxRecordingTimeMsec - optional - The maximum
 	 *                  number of milliseconds to record before forcing a
-	 *                  stop and raising a stop event. Default is 1
-	 *                  minute = 1000*60 = 60000.
+	 *                  stop and raising a stop event. A value of zero
+	 *                  means unlimited recording time -- which often means
+	 *                  that a browser tab can run out of memory, FYI. Default
+	 *                  is 1 minute = 1000*60 = 60000.
 	 *  @param {number?} recordingSampleRateMsec - optional - The number of
 	 *                  milliseconds between recording data "saves". This
 	 *                  influences how frequently the waveform display is
@@ -103,57 +106,109 @@ export class AudioControls {
 	 * @throws NoAudioInputs - if there are no audio inputs found.
 	 */
 	constructor(recordStartButtonId: string,
-	            recordStopButtonId: string      = undefined,
-	            playStartButtonId: string       = undefined,
-	            playStopButtonId: string        = undefined,
-	            waveformCanvasId: string        = undefined,
-	            waveformBackgroundCSS: string   = "black",
-	            waveformForegroundCSS: string   = "white",
-	            maxRecordingTimeMsec: number    = 60000,
-	            recordingSampleRateMsec: number = 100) {
-		//
-		// recordStartButtonId is required
-		if (!(recordStartButtonId
-		      && document.getElementById(recordStartButtonId))) {
+	            recordStopButtonId: string | undefined = undefined,
+	            playStartButtonId: string | undefined  = undefined,
+	            playStopButtonId: string | undefined   = undefined,
+	            waveformCanvasId: string | undefined   = undefined,
+	            waveformBackgroundCSS: string          = "black",
+	            waveformForegroundCSS: string          = "white",
+	            maxRecordingTimeMsec: number           = 60000,
+	            recordingSampleRateMsec: number        = 100) {
+		// RECORD START/STOP BUTTONS
+		// recordStartButtonId is REQUIRED
+		if (typeof recordStartButtonId != 'string') {
+			throw new Error(`recordStartButtonId should be a string.`)
+		}
+		if (!(recordStartButtonId && recordStartButtonId.trim())) {
+			throw new Error(`recordStartButtonId is required.`)
+		}
+		if (!document.getElementById(recordStartButtonId)) {
 			throw new Error(
-				`recordStartButtonId value "${recordStartButtonId}" `
-				+ `does not exist in the DOM.`)
+				`recordStartButtonId value "${recordStartButtonId}" does not `
+				+ `exist in the DOM.`
+			)
 		}
 		this.recordStartButtonId = recordStartButtonId
+		// if recordStopButtonId is undefined make this.recordStopButtonId
+		// the same as this.recordStartButtonId
+		let tmpType = typeof recordStopButtonId
+		if (tmpType != 'string' && tmpType != 'undefined') {
+			throw new Error(
+				`recordStopButtonId should be a string or undefined.`
+			)
+		}
 		this.recordStopButtonId = recordStopButtonId
 		if (!recordStopButtonId) {
-			this.recordStopButtonId = recordStartButtonId
+			this.recordStopButtonId = this.recordStartButtonId
 		}
 
-		if (!(playStartButtonId
-		      && document.getElementById(playStartButtonId))) {
-			throw new Error(
-				`playStartButtonId value "${playStartButtonId}" `
-				+ `does not exist in the DOM.`)
-		}
-		this.playStartButtonId = playStartButtonId
-		this.playStopButtonId = playStopButtonId
-		if (!playStopButtonId) {
-			this.playStopButtonId = playStartButtonId
+		// PLAYBACK BUTTONS
+		if (playStartButtonId) {
+			if (typeof playStartButtonId != 'string') {
+				throw new Error(`playStartButtonId should be a string.`)
+			}
+			if (!document.getElementById(playStartButtonId)) {
+				throw new Error(
+					`playStartButtonId value "${playStartButtonId}" does not `
+					+ `exist in the DOM.`
+				)
+			}
+			this.playStartButtonId = playStartButtonId
+			// if options['playStopButtonId'] is undefined make
+			// this.playStopButtonId the same as this.playStartButtonId
+			this.playStopButtonId = playStopButtonId
+			if (!playStopButtonId) {
+				this.playStopButtonId = this.playStartButtonId
+			}
 		}
 
-		if (!(waveformCanvasId
-		      && document.getElementById(waveformCanvasId))) {
-			this.waveformCanvasId = undefined
-		} else {
+		// WAVEFORM CANVAS
+		if (waveformCanvasId) {
+			if (typeof waveformCanvasId != 'string') {
+				throw new Error(`waveformCanvasId should be a string.`)
+			}
+			if (!document.getElementById(waveformCanvasId)) {
+				throw new Error(
+					`waveformCanvasId value "${waveformCanvasId}" does not `
+					+ `exist in the DOM.`
+				)
+			}
 			this.waveformCanvasId = waveformCanvasId
-			this.waveformBackgroundCSS = waveformBackgroundCSS
-			this.waveformForegroundCSS = waveformForegroundCSS
+
+			if (waveformBackgroundCSS) {
+				if (typeof waveformBackgroundCSS != 'string') {
+					throw new Error(`waveformBackgroundCSS should be a string.`)
+				}
+				this.waveformBackgroundCSS = waveformBackgroundCSS
+			}
+			if (waveformForegroundCSS) {
+				if (typeof waveformForegroundCSS != 'string') {
+					throw new Error(`waveformForegroundCSS should be a string.`)
+				}
+				this.waveformForegroundCSS = waveformForegroundCSS
+			}
 		}
 
+		// MAX RECORDING TIME
+		if (typeof maxRecordingTimeMsec != 'number') {
+			throw new Error(
+				`maxRecordingTimeMsec should be a number in `
+				+ `milliseconds.`
+			)
+		}
 		this.maxRecordingTimeMsec = Math.trunc(maxRecordingTimeMsec)
-		if (this.maxRecordingTimeMsec === 0) {
-			throw new Error("Max Recording Time value is zero.")
-		}
 
-		this.recordingSampleRateMsec = Math.trunc(recordingSampleRateMsec)
-		if (this.recordingSampleRateMsec === 0) {
-			throw new Error("Recording Sample Rate value is zero.")
+		if (typeof recordingSampleRateMsec != 'number') {
+			throw new Error(
+				`recordingSampleRateMsec should be a number in `
+				+ `milliseconds.`
+			)
+		}
+		if (recordingSampleRateMsec) {
+			this.recordingSampleRateMsec = Math.trunc(recordingSampleRateMsec)
+			if (this.recordingSampleRateMsec === 0) {
+				throw new Error("Recording Sample Rate value is zero.")
+			}
 		}
 
 		//
@@ -204,7 +259,7 @@ export class AudioControls {
 				)
 				recordStartButton.addEventListener(
 					"click",
-					(event) => {
+					() => {
 						if (this.isRecording) {
 							return false
 						}
@@ -217,7 +272,7 @@ export class AudioControls {
 				)
 				recordStopButton.addEventListener(
 					"click",
-					(event) => {
+					() => {
 						if (!this.isRecording) {
 							return false
 						}
@@ -230,7 +285,7 @@ export class AudioControls {
 				)
 				playStartButton.addEventListener(
 					"click",
-					(event) => {
+					() => {
 						this.playRecording();
 					}
 				)
@@ -305,7 +360,7 @@ export class AudioControls {
 				);
 				this.mediaRecorder.addEventListener(
 					'stop',
-					(event) => {
+					() => {
 						this.onStop()
 					}
 				);
@@ -340,7 +395,7 @@ export class AudioControls {
 			(track) => {
 				track.addEventListener(
 					'stop',
-					(event) => {
+					() => {
 						console.log(`Track "${track.label}" is stopped.`)
 					}
 				)
@@ -396,7 +451,7 @@ export class AudioControls {
 				source.connect(ctx.destination);
 				source.addEventListener(
 					'ended',
-					(event) => {
+					() => {
 						document.getElementById(
 							this.playStopButtonId
 						).dispatchEvent(
