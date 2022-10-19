@@ -333,20 +333,22 @@ export class AudioControls {
 							)
 
 							// set a max recording timeout
-							this.recordingTimeExceededId = setTimeout(
-								() => {
-									this.mediaRecorder.stop()
+							if (this.maxRecordingTimeMsec > 0) {
+								this.recordingTimeExceededId = setTimeout(
+									() => {
+										this.mediaRecorder.stop()
 
-									if (this.maxRecordingTimeMsec) {
-										document.getElementById(
-											this.recordStopButtonId
-										).dispatchEvent(
-											this.recordingTimeExceeded
-										)
-									}
-								},
-								this.maxRecordingTimeMsec
-							)
+										if (this.maxRecordingTimeMsec) {
+											document.getElementById(
+												this.recordStopButtonId
+											).dispatchEvent(
+												this.recordingTimeExceeded
+											)
+										}
+									},
+									this.maxRecordingTimeMsec
+								)
+							}
 						}
 
 						if (audioData.data.size > 0) {
