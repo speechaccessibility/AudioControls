@@ -24,30 +24,33 @@
  SOFTWARE.
  */
 
+import * as buffer from "buffer";
+
 export class AudioControls {
-	private chunks: Blob[] = [];
-	private mediaRecorder?: MediaRecorder;
-	private stream?: MediaStream;
-	private unsavedAudio: Blob = new Blob();
+	private _chunks: Blob[] = [];
+	private _mediaRecorder?: MediaRecorder;
+	private _stream?: MediaStream;
+	public unsavedAudio: Blob = new Blob();
 
 	// constructor params
-	private readonly playStartButtonId: string;
-	private readonly playStopButtonId: string;
-	private readonly recordStartButtonId: string;
-	private readonly recordStopButtonId: string;
+	private readonly _codec: string = undefined
+	private readonly _playStartButtonId: string;
+	private readonly _playStopButtonId: string;
+	private readonly _recordStartButtonId: string;
+	private readonly _recordStopButtonId: string;
 
-	private readonly waveformCanvasId: string;
-	private readonly waveformBackgroundCSS: string = 'black'
-	private readonly waveformForegroundCSS: string = 'white'
+	private readonly _waveformCanvasId: string;
+	private readonly _waveformBackgroundCSS: string = 'black'
+	private readonly _waveformForegroundCSS: string = 'white'
 
-	private readonly maxRecordingTimeMsec: number = 60000
-	private readonly recordingSampleRateMsec: number = 100
+	private readonly _maxRecordingTimeMsec: number = 60000
+	private readonly _recordingSampleRateMsec: number = 250
 
 	availableInputDevices: MediaDeviceInfo[] = [];
 
-	private recordingTimeExceededId: NodeJS.Timeout;
-	private isRecording: boolean = false
-	private isPlaying: boolean = false
+	private _recordingTimeExceededId: NodeJS.Timeout;
+	private _isRecording: boolean = false
+	private _isPlaying: boolean = false
 
 	//
 	// Events
@@ -71,6 +74,8 @@ export class AudioControls {
 	 *  Setup basic audio recording in the browser.
 	 *
 	 *  @constructor
+	 *  @param {string} codec - required - A string representing the mime
+	 *                  type and codec associated with the browser.
 	 *  @param {string} recordStartButtonId - required - DOM Element ID of the
 	 *                  Recording Start button.
 	 *  @param {string?} recordStopButtonId - optional - DOM Element ID of the
@@ -105,7 +110,8 @@ export class AudioControls {
 	 *
 	 * @throws NoAudioInputs - if there are no audio inputs found.
 	 */
-	constructor(recordStartButtonId: string,
+	constructor(codec: string,
+	            recordStartButtonId: string | undefined,
 	            recordStopButtonId: string | undefined = undefined,
 	            playStartButtonId: string | undefined  = undefined,
 	            playStopButtonId: string | undefined   = undefined,
@@ -114,78 +120,115 @@ export class AudioControls {
 	            waveformForegroundCSS: string          = "white",
 	            maxRecordingTimeMsec: number           = 60000,
 	            recordingSampleRateMsec: number        = 100) {
+		// codec is REQUIRED
+		if (!(codec && codec.trim())) {
+			throw new Error(`recordStartButtonId is required.`)
+		}
+		if (typeof codec != 'string') {
+			throw new Error(`codec should be a string.`)
+		}
+		this._codec = codec.trim()
+
 		// RECORD START/STOP BUTTONS
 		// recordStartButtonId is REQUIRED
-		if (typeof recordStartButtonId != 'string') {
-			throw new Error(`recordStartButtonId should be a string.`)
-		}
 		if (!(recordStartButtonId && recordStartButtonId.trim())) {
 			throw new Error(`recordStartButtonId is required.`)
 		}
+		if (typeof recordStartButtonId != 'string') {
+			throw new Error(`recordStartButtonId should be a string.`)
+		}
+		recordStartButtonId = recordStartButtonId.trim()
 		if (!document.getElementById(recordStartButtonId)) {
 			throw new Error(
 				`recordStartButtonId value "${recordStartButtonId}" does not `
 				+ `exist in the DOM.`
 			)
 		}
-		this.recordStartButtonId = recordStartButtonId
+		this._recordStartButtonId = recordStartButtonId
 		// if recordStopButtonId is undefined make this.recordStopButtonId
 		// the same as this.recordStartButtonId
-		let tmpType = typeof recordStopButtonId
-		if (tmpType != 'string' && tmpType != 'undefined') {
-			throw new Error(
-				`recordStopButtonId should be a string or undefined.`
-			)
-		}
-		this.recordStopButtonId = recordStopButtonId
-		if (!recordStopButtonId) {
-			this.recordStopButtonId = this.recordStartButtonId
+		if (!(recordStopButtonId && recordStopButtonId.trim())) {
+			this._recordStopButtonId = this._recordStartButtonId
+		} else {
+			if (typeof recordStopButtonId != 'string') {
+				throw new Error(
+					`recordStopButtonId should be a string or undefined.`
+				)
+			}
+			recordStopButtonId = recordStopButtonId.trim()
+			if (!document.getElementById(recordStopButtonId)) {
+				throw new Error(
+					`recordStopButtonId value "${recordStopButtonId}" does not `
+					+ `exist in the DOM.`
+				)
+			}
+			this._recordStopButtonId = recordStopButtonId
 		}
 
 		// PLAYBACK BUTTONS
-		if (playStartButtonId) {
+		if (!(playStartButtonId && playStartButtonId.trim())) {
+			// no start button ID so no stop button ID
+			this._playStartButtonId = undefined
+			this._playStopButtonId = undefined
+		} else {
+			// there is a start button ID
 			if (typeof playStartButtonId != 'string') {
 				throw new Error(`playStartButtonId should be a string.`)
 			}
+			playStartButtonId = playStartButtonId.trim()
 			if (!document.getElementById(playStartButtonId)) {
 				throw new Error(
 					`playStartButtonId value "${playStartButtonId}" does not `
 					+ `exist in the DOM.`
 				)
 			}
-			this.playStartButtonId = playStartButtonId
-			// if options['playStopButtonId'] is undefined make
-			// this.playStopButtonId the same as this.playStartButtonId
-			this.playStopButtonId = playStopButtonId
-			if (!playStopButtonId) {
-				this.playStopButtonId = this.playStartButtonId
+			this._playStartButtonId = playStartButtonId
+			if (!(playStopButtonId && playStopButtonId.trim())) {
+				// no stop button
+				this._playStopButtonId = this._playStartButtonId
+			} else {
+				if (typeof playStopButtonId != 'string') {
+					throw new Error(`playStopButtonId should be a string.`)
+				}
+				playStopButtonId = playStopButtonId.trim()
+				if (!document.getElementById(playStopButtonId)) {
+					throw new Error(
+						`playStopButtonId value "${playStopButtonId}" does not `
+						+ `exist in the DOM.`
+					)
+				}
+				this._playStopButtonId = playStopButtonId
 			}
 		}
 
 		// WAVEFORM CANVAS
-		if (waveformCanvasId) {
+		if (!(waveformCanvasId && waveformCanvasId.trim())) {
+			// no start button ID so no stop button ID
+			this._waveformCanvasId = undefined
+		} else {
 			if (typeof waveformCanvasId != 'string') {
 				throw new Error(`waveformCanvasId should be a string.`)
 			}
+			waveformCanvasId = waveformCanvasId.trim()
 			if (!document.getElementById(waveformCanvasId)) {
 				throw new Error(
 					`waveformCanvasId value "${waveformCanvasId}" does not `
 					+ `exist in the DOM.`
 				)
 			}
-			this.waveformCanvasId = waveformCanvasId
+			this._waveformCanvasId = waveformCanvasId
 
 			if (waveformBackgroundCSS) {
 				if (typeof waveformBackgroundCSS != 'string') {
 					throw new Error(`waveformBackgroundCSS should be a string.`)
 				}
-				this.waveformBackgroundCSS = waveformBackgroundCSS
+				this._waveformBackgroundCSS = waveformBackgroundCSS.trim()
 			}
 			if (waveformForegroundCSS) {
 				if (typeof waveformForegroundCSS != 'string') {
 					throw new Error(`waveformForegroundCSS should be a string.`)
 				}
-				this.waveformForegroundCSS = waveformForegroundCSS
+				this._waveformForegroundCSS = waveformForegroundCSS.trim()
 			}
 		}
 
@@ -196,7 +239,7 @@ export class AudioControls {
 				+ `milliseconds.`
 			)
 		}
-		this.maxRecordingTimeMsec = Math.trunc(maxRecordingTimeMsec)
+		this._maxRecordingTimeMsec = Math.trunc(maxRecordingTimeMsec)
 
 		if (typeof recordingSampleRateMsec != 'number') {
 			throw new Error(
@@ -205,8 +248,8 @@ export class AudioControls {
 			)
 		}
 		if (recordingSampleRateMsec) {
-			this.recordingSampleRateMsec = Math.trunc(recordingSampleRateMsec)
-			if (this.recordingSampleRateMsec === 0) {
+			this._recordingSampleRateMsec = Math.trunc(recordingSampleRateMsec)
+			if (this._recordingSampleRateMsec === 0) {
 				throw new Error("Recording Sample Rate value is zero.")
 			}
 		}
@@ -225,8 +268,11 @@ export class AudioControls {
 		})
 
 		this.initializeRecording().catch(
-			reason => {
-				throw new Error(reason);
+			error => {
+				$('div#errors').append(
+					`<p>AudioControls: initializeRecording: ${error}</p>`
+				)
+				throw new Error(error);
 			}
 		);
 	}
@@ -250,38 +296,47 @@ export class AudioControls {
 				if (!stream) {
 					throw new Error('No MediaStream "stream" found.');
 				}
-				this.stream = stream;
+				this._stream = stream;
 
 				//
 				// setup primary event listeners
 				const recordStartButton = document.getElementById(
-					this.recordStartButtonId
+					this._recordStartButtonId
 				)
 				recordStartButton.addEventListener(
 					"click",
 					() => {
-						if (this.isRecording) {
+						if (this._isRecording) {
 							return false
 						}
-						this.startRecording()
+						this.startRecording().catch(
+							(error) => {
+								$('div#errors').append(
+									`<p>AudioControls: startRecording: ${error}</p>`
+								)
+								throw new Error(
+									`startRecording error: ${error}`
+								)
+							}
+						)
 					}
 				)
 
 				const recordStopButton = document.getElementById(
-					this.recordStopButtonId
+					this._recordStopButtonId
 				)
 				recordStopButton.addEventListener(
 					"click",
 					() => {
-						if (!this.isRecording) {
+						if (!this._isRecording) {
 							return false
 						}
-						this.mediaRecorder.stop();
+						this._mediaRecorder.stop();
 					}
 				)
 
 				const playStartButton = document.getElementById(
-					this.playStartButtonId
+					this._playStartButtonId
 				)
 				playStartButton.addEventListener(
 					"click",
@@ -291,8 +346,11 @@ export class AudioControls {
 				)
 			}
 		).catch(
-			reason => {
-				throw new Error(reason);
+			error => {
+				$('div#errors').append(
+					`<p>AudioControls: mediaDevices.getUserMedia: ${error}</p>`
+				)
+				throw new Error(error);
 			}
 		);
 	}
@@ -313,54 +371,58 @@ export class AudioControls {
 	private async startRecording(): Promise<unknown> {
 		return new Promise(
 			() => {
-				this.chunks = [];
+				this._chunks = [];
 
-				this.mediaRecorder = new MediaRecorder(
-					this.stream,
-					{mimeType: 'audio/webm'}
+				if (!this._codec) {
+					throw new Error("Codec was not specified.")
+				}
+
+				this._mediaRecorder = new MediaRecorder(
+					this._stream,
+					{
+						mimeType: this._codec
+					}
 				);
-				this.mediaRecorder.addEventListener(
+				this._mediaRecorder.addEventListener(
 					'dataavailable',
 					(audioData) => {
-						if (this.chunks.length == 0) {
+						if (this._chunks.length == 0) {
 							// send the start recording event to
 							// the start button
-							this.isRecording = true
+							this._isRecording = true
 							document.getElementById(
-								this.recordStartButtonId
+								this._recordStartButtonId
 							).dispatchEvent(
 								this.eventStartedRecording
 							)
 
 							// set a max recording timeout
-							if (this.maxRecordingTimeMsec > 0) {
-								this.recordingTimeExceededId = setTimeout(
+							if (this._maxRecordingTimeMsec > 0) {
+								this._recordingTimeExceededId = setTimeout(
 									() => {
-										this.mediaRecorder.stop()
+										this._mediaRecorder.stop()
 
-										if (this.maxRecordingTimeMsec) {
+										if (this._maxRecordingTimeMsec) {
 											document.getElementById(
-												this.recordStopButtonId
+												this._recordStopButtonId
 											).dispatchEvent(
 												this.recordingTimeExceeded
 											)
 										}
 									},
-									this.maxRecordingTimeMsec
+									this._maxRecordingTimeMsec
 								)
 							}
 						}
 
-						if (audioData.data.size > 0) {
-							this.chunks.push(audioData.data);
-						}
+						this._chunks.push(audioData.data);
 
-						if (this.waveformCanvasId) {
+						if (this._waveformCanvasId) {
 							this.decodeAndDisplayAudio();
 						}
 					}
 				);
-				this.mediaRecorder.addEventListener(
+				this._mediaRecorder.addEventListener(
 					'stop',
 					() => {
 						this.onStop()
@@ -369,7 +431,7 @@ export class AudioControls {
 
 				//
 				// start recording here
-				this.mediaRecorder.start(this.recordingSampleRateMsec);
+				this._mediaRecorder.start(this._recordingSampleRateMsec);
 			}
 		);
 	}
@@ -380,7 +442,7 @@ export class AudioControls {
 	 * @DOM_Events 'AudioControls.RecordingStopped': when playing has finished.
 	 */
 	private onStop() {
-		if (!this.isRecording) {
+		if (!this._isRecording) {
 			throw new Error('Stop Recording called when Start Recording was'
 			                + ' not active.')
 		}
@@ -391,14 +453,15 @@ export class AudioControls {
 
 		//
 		// How many audio tracks are there? Should be at least one.
-		this.stream.getTracks().filter(
+		this._stream.getTracks().filter(
 			(d) => d.kind === 'audio'
 		).forEach(
 			(track) => {
 				track.addEventListener(
 					'stop',
 					() => {
-						console.log(`Track "${track.label}" is stopped.`)
+						let trackLabel = track.label
+						// console.log(`Track "${track.label}" is stopped.`)
 					}
 				)
 				track.stop()
@@ -406,21 +469,26 @@ export class AudioControls {
 		)
 
 		//
-		// this.unsavedAudio is the raw, unsubmitted audio data.
-		if (this.chunks.length == 0) {
+		// this.unsavedAudio is the raw, un-submitted audio data.
+		if (this._chunks.length == 0) {
 			throw new Error('There are no audio chunks.')
 		}
-		this.unsavedAudio = new Blob(this.chunks);
+		this.unsavedAudio = new Blob(
+			this._chunks,
+			{
+				'type': this._codec
+			}
+		);
 
-		this.isRecording = false
+		this._isRecording = false
 
-		clearTimeout(this.recordingTimeExceededId)
-		this.recordingTimeExceededId = undefined
+		clearTimeout(this._recordingTimeExceededId)
+		this._recordingTimeExceededId = undefined
 
 		// send the stop recording event to
 		// the stop button
 		document.getElementById(
-			this.recordStopButtonId
+			this._recordStopButtonId
 		).dispatchEvent(
 			this.eventStopRecording
 		)
@@ -433,55 +501,73 @@ export class AudioControls {
 	 * @DOM_Events 'AudioControls.FinishedPlaying': when playing has finished.
 	 */
 	private async playRecording() {
-		if (!(this.unsavedAudio || this.unsavedAudio.size === 0)) {
-			throw new Error(
-				'Received request to play but there was no saved audio.')
-		}
-		if (this.isPlaying) {
-			return
-		}
-
-		const ctx = new AudioContext();
-		const fileReader = new FileReader();
-
-		fileReader.onload = () => ctx.decodeAudioData(
-			<ArrayBuffer>fileReader.result
-		).then(
-			buf => {
-				const source = ctx.createBufferSource();
-				source.buffer = buf;
-				source.connect(ctx.destination);
-				source.addEventListener(
-					'ended',
-					() => {
-						document.getElementById(
-							this.playStopButtonId
-						).dispatchEvent(
-							this.eventStopPlaying
-						)
-					}
-				);
-
-				document.getElementById(
-					this.playStopButtonId
-				).dispatchEvent(
-					this.eventStartPlaying
-				)
-				this.isPlaying = true
-
-				//
-				// start playback
-				source.start(0);
-
-				this.isPlaying = false
+		try {
+			if (!(this.unsavedAudio || this.unsavedAudio.size === 0)) {
+				throw new Error(
+					'Received request to play but there was no saved audio.')
 			}
-		).catch(
-			(error) => {
-				console.log(error)
+			if (this._isPlaying) {
+				return
 			}
-		)
 
-		fileReader.readAsArrayBuffer(this.unsavedAudio);
+			const audioCtx = new AudioContext();
+
+			new Blob(
+				this._chunks,
+				{'type': this._codec}
+			).arrayBuffer().then(
+				buffer => {
+					audioCtx.decodeAudioData(
+						buffer
+					).then(
+						buf => {
+							const source = audioCtx.createBufferSource();
+							source.buffer = buf;
+							source.connect(audioCtx.destination);
+							source.addEventListener(
+								'ended',
+								() => {
+									document.getElementById(
+										this._playStopButtonId
+									).dispatchEvent(
+										this.eventStopPlaying
+									)
+								}
+							);
+
+							document.getElementById(
+								this._playStopButtonId
+							).dispatchEvent(
+								this.eventStartPlaying
+							)
+							this._isPlaying = true
+
+							//
+							// start playback
+							source.start(0);
+
+							this._isPlaying = false
+						}
+					).catch(
+						(error) => {
+							$('div#errors').append(
+								`<p>AudioControls: playRecording decodeAudioData: ${error}</p>`
+							)
+							throw new Error(error)
+						}
+					)
+				}
+			).catch(
+				(error) => {
+					$('div#errors').append(
+						`<p>AudioControls: playRecording arrayBuffer: ${error}</p>`
+					)
+					throw new Error(error)
+				}
+			)
+		} catch (e) {
+			throw new Error(`playRecording: ${e}`)
+		}
 	}
 
 	/**
@@ -495,7 +581,7 @@ export class AudioControls {
 		// HTMLCanvasElement. Putting in this 'ignore' to silence the nagging.
 		// @ts-ignore
 		const canvas: HTMLCanvasElement = document.getElementById(
-			this.waveformCanvasId
+			this._waveformCanvasId
 		)
 
 		const canvasCtx = canvas.getContext("2d")
@@ -504,12 +590,12 @@ export class AudioControls {
 
 		//
 		// set background color to black
-		canvasCtx.fillStyle = this.waveformBackgroundCSS
+		canvasCtx.fillStyle = this._waveformBackgroundCSS
 		canvasCtx.fillRect(0, 0, width, height);
 
 		//
 		// set foreground color
-		canvasCtx.fillStyle = this.waveformForegroundCSS
+		canvasCtx.fillStyle = this._waveformForegroundCSS
 
 		//
 		// get the raw audio data for this recording timeslice. The
@@ -519,7 +605,17 @@ export class AudioControls {
 
 		// divide the raw data length by the canvas width to get the per-pixel
 		// chunk size
-		const chunkSize = Math.max(1, Math.ceil(rawAudioData.length / width))
+		let rawAudioDataLength = rawAudioData.length
+		let offset = 0
+		let windowLength = 1024 * 16
+		if (rawAudioDataLength > windowLength) {
+			offset = rawAudioDataLength - windowLength
+		}
+		let workingData = rawAudioData.slice(offset, rawAudioDataLength - 1)
+		const chunkSize = Math.max(
+			1,
+			Math.ceil(workingData.length / width)
+		)
 
 		// each pixel-chunk of audio data could have values above and below
 		// zero. The positive values will contribute to the displayed area
@@ -538,7 +634,7 @@ export class AudioControls {
 			// array slice the raw data into pixel-chunks
 			const start = x * chunkSize
 			const end = start + chunkSize
-			const chunk = rawAudioData.slice(start, end)
+			const chunk = workingData.slice(start, end)
 
 			// find and save the largest and smallest values in this chunk
 			positiveValues.push(Math.max(...chunk))
@@ -587,8 +683,16 @@ export class AudioControls {
 		// "positive" value.  The bottom of the rectangle is the distance
 		// from the origin to the scaled "negative" value.
 		for (let x = 0; x < positiveValues.length; x++) {
-			let top = positiveValues[x] / scalingFactor
-			let bottom = negativeValues[x] / scalingFactor
+			let top = positiveValues[x]
+			if (top < 0.0001) {
+				top = 0.0
+			}
+			let bottom = negativeValues[x]
+			if (bottom > -0.0001) {
+				bottom = 0.0
+			}
+			top /= scalingFactor
+			bottom /= scalingFactor
 
 			// "x" is the horizontal pixel position along the origin line.
 			// "y" is how high above the origin the rectangle will start.
@@ -607,18 +711,52 @@ export class AudioControls {
 	 * Convert the recorded Blob into audio
 	 */
 	private async decodeAndDisplayAudio() {
-		// convert the blob audio data into an AudioContext and prepare to
-		// display a "waveform".
-		const audioCtx = new AudioContext();
+		try {
+			// convert the blob audio data into an AudioContext and prepare to
+			// display a "waveform".
+			const audioCtx = new AudioContext();
 
-		const fileReader = new FileReader();
-		fileReader.readAsArrayBuffer(new Blob(this.chunks));
-		fileReader.onload = () => audioCtx.decodeAudioData(
-			<ArrayBuffer>fileReader.result
-		).then(
-			buf => {
-				this.drawWaveform(buf)
-			}
+			new Blob(
+				this._chunks,
+				{'type': this._codec}
+			).arrayBuffer().then(
+				buffer => {
+					audioCtx.decodeAudioData(
+						buffer
+					).then(
+						buf => {
+							this.drawWaveform(buf)
+						}
+					).catch(
+						error => {
+							$('div#errors').append(
+								`<p>AudioControls: decodeAndDisplayAudio decodeAudioData: ${error}</p>`
+							)
+							throw new Error(error)
+						}
+					)
+				}
+			).catch(
+				error => {
+					$('div#errors').append(
+						`<p>AudioControls: decodeAndDisplayAudio arrayBuffer: ${error}</p>`
+					)
+					throw new Error(error)
+				}
+			)
+		} catch (e) {
+			throw new Error(`decodeAndDisplayAudio: ${e}`)
+		}
+	}
+
+	public getAudioBlob(): Blob {
+		if (this._isRecording) {
+			return undefined
+		}
+
+		return new Blob(
+			this._chunks,
+			{'type': this._codec}
 		)
 	}
 }
