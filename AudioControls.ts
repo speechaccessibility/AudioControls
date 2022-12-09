@@ -128,6 +128,20 @@ export class AudioControls {
      *                  milliseconds between recording data "saves". This
      *                  influences how frequently the waveform display is
      *                  redrawn. Default is 100 milliseconds.
+     *  @param {number?} audio_display_threshold - optional - Default = 0.005. A
+     *                  floating point value less than 1. This only effects
+     *                  visual display data. Display data have values
+     *                  between -1.0 and 1.0. A microphone may pick up very
+     *                  quiet sounds that may show up in the display. Values
+     *                  between negative(audio_display_threshold) and
+     *                  positive(audio_display_threshold) will be set to zero.
+     *  @param {number?} audio_display_value_length - optional - Default =
+     *                  16K. The maximum amount of audio data to display during
+     *                  each render cycle. Trying to display all the data
+     *                  each time quickly becomes impossible. The data
+     *                  selected for display is the last/most recent
+     *                  audio_display_value_length amount of data per render
+     *                  cycle.
      *
      * @throws NoAudioInputs - if there are no audio inputs found.
      */
@@ -140,7 +154,9 @@ export class AudioControls {
                 waveformBackgroundCSS: string          = "black",
                 waveformForegroundCSS: string          = "white",
                 maxRecordingTimeMsec: number           = 60000,
-                recordingSampleRateMsec: number        = 100) {
+                recordingSampleRateMsec: number        = 100,
+                audio_display_threshold: number        = 0.005,
+                audio_display_value_length: number     = 1024*16) {
         // codec is REQUIRED
         if (!(codec && codec.trim())) {
             throw new Error(`recordStartButtonId is required.`)
@@ -274,6 +290,33 @@ export class AudioControls {
                 throw new Error("Recording Sample Rate value is zero.")
             }
         }
+
+        // AUDIO DISPLAY THRESHOLD
+        if (typeof audio_display_threshold != 'number') {
+            throw new Error(
+                `audio_display_threshold should be a floating point number.`
+            )
+        }
+        if (audio_display_threshold > 1.0 || audio_display_threshold < -1.0) {
+            throw new Error(
+                `audio_display_threshold only has a useful range between -1.0 `
+                + `and 1.0. Default is 0.005.`
+            )
+        }
+        this.audio_display_threshold = audio_display_threshold
+
+        // AUDIO DISPLAY VALUE LENGTH
+        if (typeof audio_display_value_length != 'number') {
+            throw new Error(
+                `audio_display_value_length should be an integer > 0.`
+            )
+        }
+        if (audio_display_value_length < 1) {
+            throw new Error(
+                `audio_display_value_length only has a useful integer range > 0.`
+            )
+        }
+        this.audio_display_value_length = Math.trunc(audio_display_value_length)
 
         //
         // get list of available input devices. The "list" is probably not
