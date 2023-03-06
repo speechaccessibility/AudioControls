@@ -31,24 +31,8 @@ Example:
             }
         )
 
-        let playButton = document.getElementById('playButton')
-        playButton.addEventListener(
-            'AudioControls.PlayingStarted',
-            (event) => {
-                console.log('AudioControls.PlayingStarted')
-            }
-        )
-        playButton.addEventListener(
-            'AudioControls.PlayingStopped',
-            (event) => {
-                console.log('AudioControls.PlayingStopped')
-            }
-        )
-
         const thing = new AudioControls(
             'recordButton',
-            undefined,
-            'playButton',
             undefined,
             'waveform',
         );
