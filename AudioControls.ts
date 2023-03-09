@@ -30,12 +30,8 @@ export class AudioControls {
 	private _chunks: Blob[] = [];
 	private _mediaRecorder?: MediaRecorder;
 	private _stream?: MediaStream;
-	public unsavedAudio: Blob = new Blob();
-	public bitRate: number;
 
 	private _recordingContext: AudioContext;
-
-	private _recordingData: {};
 
 	// constructor params
 	private readonly _codec: string = undefined
@@ -48,8 +44,6 @@ export class AudioControls {
 
 	private readonly _maxRecordingTimeMsec: number = 60000
 	private readonly _recordingSampleRateMsec: number = 250
-
-	availableInputDevices: MediaDeviceInfo[] = [];
 
 	private _recordingTimeExceededId: NodeJS.Timeout;
 	private _isRecording: boolean = false
@@ -151,27 +145,35 @@ export class AudioControls {
 	            audio_display_value_length: number     = 1024 * 16) {
 		// codec is REQUIRED
 		if (!(codec && codec.trim())) {
-			throw new Error(`recordStartButtonId is required.`)
+			let msg = `recordStartButtonId is required.`
+			console.log(msg)
+			throw new Error(msg)
 		}
 		if (typeof codec != 'string') {
-			throw new Error(`codec should be a string.`)
+			let msg = `codec should be a string.`
+			console.log(msg)
+			throw new Error(msg)
 		}
 		this._codec = codec.trim()
 
 		// RECORD START/STOP BUTTONS
 		// recordStartButtonId is REQUIRED
 		if (!(recordStartButtonId && recordStartButtonId.trim())) {
-			throw new Error(`recordStartButtonId is required.`)
+			let msg = `recordStartButtonId is required.`
+			console.log(msg)
+			throw new Error(msg)
 		}
 		if (typeof recordStartButtonId != 'string') {
-			throw new Error(`recordStartButtonId should be a string.`)
+			let msg = `recordStartButtonId should be a string.`
+			console.log(msg)
+			throw new Error(msg)
 		}
 		recordStartButtonId = recordStartButtonId.trim()
 		if (!document.getElementById(recordStartButtonId)) {
-			throw new Error(
-				`recordStartButtonId value "${recordStartButtonId}" does not `
-				+ `exist in the DOM.`
-			)
+			let msg = `recordStartButtonId value "${recordStartButtonId}" `
+			          + `does not exist in the DOM.`
+			console.log(msg)
+			throw new Error(msg)
 		}
 		this._recordStartButtonId = recordStartButtonId
 		// if recordStopButtonId is undefined make this.recordStopButtonId
@@ -180,16 +182,16 @@ export class AudioControls {
 			this._recordStopButtonId = this._recordStartButtonId
 		} else {
 			if (typeof recordStopButtonId != 'string') {
-				throw new Error(
-					`recordStopButtonId should be a string or undefined.`
-				)
+				let msg = `recordStopButtonId should be a string or undefined.`
+				console.log(msg)
+				throw new Error(msg)
 			}
 			recordStopButtonId = recordStopButtonId.trim()
 			if (!document.getElementById(recordStopButtonId)) {
-				throw new Error(
-					`recordStopButtonId value "${recordStopButtonId}" does not `
-					+ `exist in the DOM.`
-				)
+				let msg = `recordStopButtonId value "${recordStopButtonId}" `
+				          + `does not exist in the DOM.`
+				console.log(msg)
+				throw new Error(msg)
 			}
 			this._recordStopButtonId = recordStopButtonId
 		}
@@ -200,26 +202,32 @@ export class AudioControls {
 			this._waveformCanvasId = undefined
 		} else {
 			if (typeof waveformCanvasId != 'string') {
-				throw new Error(`waveformCanvasId should be a string.`)
+				let msg = `waveformCanvasId should be a string.`
+				console.log(msg)
+				throw new Error(msg)
 			}
 			waveformCanvasId = waveformCanvasId.trim()
 			if (!document.getElementById(waveformCanvasId)) {
-				throw new Error(
-					`waveformCanvasId value "${waveformCanvasId}" does not `
-					+ `exist in the DOM.`
-				)
+				let msg = `waveformCanvasId value "${waveformCanvasId}" `
+				          + `does not exist in the DOM.`
+				console.log(msg)
+				throw new Error(msg)
 			}
 			this._waveformCanvasId = waveformCanvasId
 
 			if (waveformBackgroundCSS) {
 				if (typeof waveformBackgroundCSS != 'string') {
-					throw new Error(`waveformBackgroundCSS should be a string.`)
+					let msg = `waveformBackgroundCSS should be a string.`
+					console.log(msg)
+					throw new Error(msg)
 				}
 				this._waveformBackgroundCSS = waveformBackgroundCSS.trim()
 			}
 			if (waveformForegroundCSS) {
 				if (typeof waveformForegroundCSS != 'string') {
-					throw new Error(`waveformForegroundCSS should be a string.`)
+					let msg = `waveformForegroundCSS should be a string.`
+					console.log(msg)
+					throw new Error(msg)
 				}
 				this._waveformForegroundCSS = waveformForegroundCSS.trim()
 			}
@@ -227,10 +235,10 @@ export class AudioControls {
 
 		// MAX RECORDING TIME
 		if (typeof maxRecordingTimeMsec != 'number') {
-			throw new Error(
-				`maxRecordingTimeMsec should be a number in `
-				+ `milliseconds.`
-			)
+			let msg = `maxRecordingTimeMsec should be a number in `
+			          + `milliseconds.`
+			console.log(msg)
+			throw new Error(msg)
 		}
 		this._maxRecordingTimeMsec = Math.trunc(maxRecordingTimeMsec)
 
@@ -243,34 +251,38 @@ export class AudioControls {
 		if (recordingSampleRateMsec) {
 			this._recordingSampleRateMsec = Math.trunc(recordingSampleRateMsec)
 			if (this._recordingSampleRateMsec === 0) {
-				throw new Error("Recording Sample Rate value is zero.")
+				let msg = `Recording Sample Rate value is zero.`
+				console.log(msg)
+				throw new Error(msg)
 			}
 		}
 
 		// AUDIO DISPLAY THRESHOLD
 		if (typeof audio_display_threshold != 'number') {
-			throw new Error(
-				`audio_display_threshold should be a floating point number.`
-			)
+			let msg = `audio_display_threshold should be a floating `
+			          + `point number.`
+			console.log(msg)
+			throw new Error(msg)
 		}
 		if (audio_display_threshold > 1.0 || audio_display_threshold < -1.0) {
-			throw new Error(
-				`audio_display_threshold only has a useful range between -1.0 `
-				+ `and 1.0. Default is 0.005.`
-			)
+			let msg = `audio_display_threshold only has a useful range `
+			          + `between -1.0 and 1.0. Default is 0.005.`
+			console.log(msg)
+			throw new Error(msg)
 		}
 		this.audio_display_threshold = audio_display_threshold
 
 		// AUDIO DISPLAY VALUE LENGTH
 		if (typeof audio_display_value_length != 'number') {
-			throw new Error(
-				`audio_display_value_length should be an integer > 0.`
-			)
+			let msg = `audio_display_value_length should be an integer > 0.`
+			console.log(msg)
+			throw new Error(msg)
 		}
 		if (audio_display_value_length < 1) {
-			throw new Error(
-				`audio_display_value_length only has a useful integer range > 0.`
-			)
+			let msg = `audio_display_value_length only has a useful integer`
+			          + ` range > 0.`
+			console.log(msg)
+			throw new Error(msg)
 		}
 		this.audio_display_value_length = Math.trunc(audio_display_value_length)
 
@@ -281,21 +293,30 @@ export class AudioControls {
 		try {
 			devices = navigator.mediaDevices.enumerateDevices()
 		} catch {
-			throw new Error('Browser Not Supported')
+			let msg = `Browser Not Supported.`
+			console.log(msg)
+			throw new Error(msg)
 		}
+
 		devices.then(
 			devices => {
-				this.availableInputDevices = devices.filter(
+				//
+				// There are devices attached. Are there any audio input
+				// devices?
+				const availableInputDevices = devices.filter(
 					(d) => d.kind === 'audioinput'
 				)
 
-				if (!this.availableInputDevices.length) {
-					throw new Error("No input devices found.")
+				if (!availableInputDevices.length) {
+					let msg = `No input devices found.`
+					console.log(msg)
+					throw new Error(msg)
 				}
 
 				this.initializeRecording()
 					.catch(
 						(error) => {
+							console.log(error.message)
 							throw error.message
 						}
 					)
@@ -340,7 +361,8 @@ export class AudioControls {
 				AudioContext || webkitAudioContext
 			)()
 		} catch (e) {
-			throw new Error('Browser Not Supported')
+			console.log(e)
+			throw e
 		}
 
 		//
@@ -353,7 +375,9 @@ export class AudioControls {
 		).then(
 			stream => {
 				if (!stream) {
-					throw new Error('No MediaStream "stream" found.');
+					let msg = `No MediaStream "stream" found.`
+					console.log(msg)
+					throw new Error(msg)
 				}
 				this._stream = stream;
 
@@ -370,9 +394,9 @@ export class AudioControls {
 						}
 						this.startRecording().catch(
 							(error) => {
-								throw new Error(
-									`startRecording error: ${error}`
-								)
+								let msg = `startRecording error: ${error.message}.`
+								console.log(msg)
+								throw new Error(msg)
 							}
 						)
 					}
@@ -392,8 +416,9 @@ export class AudioControls {
 				)
 			}
 		).catch(
-			error => {
-				throw new Error(error);
+			(error) => {
+				console.log(error.message)
+				throw new Error(error.message);
 			}
 		);
 	}
@@ -417,7 +442,9 @@ export class AudioControls {
 				this._chunks = [];
 
 				if (!this._codec) {
-					throw new Error("Codec was not specified.")
+					let msg = `Codec was not specified.`
+					console.log(msg)
+					throw new Error(msg)
 				}
 
 				try {
@@ -428,12 +455,8 @@ export class AudioControls {
 						}
 					);
 				} catch (e) {
-					throw new Error('Browser Not Supported')
-				}
-				try {
-					this.bitRate = this._mediaRecorder.audioBitsPerSecond
-				} catch (e) {
-					throw new Error('Browser Not Supported')
+					console.log(e)
+					throw e
 				}
 				this._mediaRecorder.addEventListener(
 					'dataavailable',
@@ -472,6 +495,7 @@ export class AudioControls {
 						if (this._waveformCanvasId) {
 							this.decodeAndDisplayAudio().catch(
 								(error) => {
+									console.log(error.message)
 									throw new Error(error.message)
 								}
 							)
@@ -499,8 +523,9 @@ export class AudioControls {
 	 */
 	private onStop() {
 		if (!this._isRecording) {
-			throw new Error('Stop Recording called when Start Recording was'
-			                + ' not active.')
+			console.log('Stop Recording called when Start Recording was not'
+			            + ' active.')
+			return
 		}
 
 		//
@@ -513,7 +538,8 @@ export class AudioControls {
 		try {
 			getTracks = this._stream.getTracks()
 		} catch (e) {
-			throw new Error('Browser Not Supported')
+			console.log(e)
+			throw e
 		}
 
 		let recordingData = {}
@@ -531,11 +557,10 @@ export class AudioControls {
 				}
 
 				recordingData['track information']
-					['per track information'].push(
-					{
-						'track number': index,
-						'track label' : track.label
-					}
+					['per track information'].push({
+						                               'track number': index,
+						                               'track label' : track.label
+					                               }
 				)
 
 				track.stop()
@@ -548,19 +573,22 @@ export class AudioControls {
 		this._recordingTimeExceededId = undefined
 
 		//
-		// this.unsavedAudio is the raw, un-submitted audio data.
+		// this._chunks is the raw, un-submitted audio data.
 		if (this._chunks.length == 0) {
-			throw new Error('There are no audio chunks.')
+			let msg = 'There are no audio chunks.'
+			console.log(msg)
+			throw new Error(msg)
 		}
 
-		this.unsavedAudio = new Blob(
+		let unsavedAudio = new Blob(
 			this._chunks,
 			{
 				'type': 'audio/wav'
 			}
 		)
+		this._chunks = undefined
 
-		this.unsavedAudio.arrayBuffer().then(
+		unsavedAudio.arrayBuffer().then(
 			(buffer) => {
 				this._recordingContext.decodeAudioData(
 					buffer
@@ -622,13 +650,15 @@ export class AudioControls {
 					}
 				).catch(
 					(error) => {
+						console.log(error.message)
 						throw new Error(error.message)
 					}
 				)
 			}
 		).catch(
 			error => {
-				throw new Error(error)
+				console.log(error.message)
+				throw new Error(error.message)
 			}
 		)
 	}
@@ -653,14 +683,22 @@ export class AudioControls {
 			const width = canvas.width;
 			const height = canvas.height;
 
+			const halfHeight = Math.floor(height / 2)
+
 			//
 			// set background color to black
 			canvasCtx.fillStyle = this._waveformBackgroundCSS
 			canvasCtx.fillRect(0, 0, width, height);
+			canvasCtx.fillStyle = this._waveformForegroundCSS
 
 			//
 			// set foreground color
-			canvasCtx.fillStyle = this._waveformForegroundCSS
+			canvasCtx.strokeStyle = this._waveformForegroundCSS
+			canvasCtx.beginPath()
+			canvasCtx.moveTo(0, halfHeight)
+			canvasCtx.lineTo(width, halfHeight)
+			canvasCtx.stroke()
+
 
 			//
 			// get the raw audio data for this recording timeslice. The
@@ -696,93 +734,94 @@ export class AudioControls {
 				Math.ceil(workingData.length / width)
 			)
 
-			// each pixel-chunk of audio data could have values above and below
-			// zero. The positive values will contribute to the displayed area
-			// above the "origin" line in the output and the negative values
-			// will be below the origin.
 			//
-			// There could be thousands+ of points in a per-pixel chunk. For
-			// quick display purposes we really only care about the single
-			// largest positive and smallest negative value in a chunk. These
-			// two points define the length of the vertical line (really a
-			// rectangle) that will represent the pixel-chunk in the result.
-			let positiveValues: number[] = []
-			let negativeValues: number[] = []
+			// find the high and low values in the workingData block
+			let workingDataMax = Number.MIN_VALUE
+			let workingDataMin = Number.MAX_VALUE
+			workingData.forEach(
+				(value) => {
+					if (value > workingDataMax) {
+						workingDataMax = value
+					}
+					if (value < workingDataMin) {
+						workingDataMin = value
+					}
+				}
+			)
 
 			//
-			// find the high and low values for each pixel chunk of data
+			// the scaling factor is based on the largest "absolute" value in
+			// this "frame" of audio data.  The largest value should always be
+			// between -1 and 1.
+			//
+			// the scaling factor is finally negated in order to "flip" the
+			// perceived direction of positive and negative audio values.
+			// This is because the canvas widget has its (0,0) "origin"
+			// point in the upper left hand corner.  "Positive" Y values then
+			// appear to increase "downwards" which makes numeric sense but
+			// not visual sense.  The end effect is that negative values
+			// multiplied by the negative scaling factor become "positive"
+			// and vice versa.
+			let scalingFactor = 1.0 / Math.max(
+				Math.abs(workingDataMax), Math.abs(workingDataMin)
+			) * -1
+
+			//
+			// loop over the incoming data
 			for (let x = 0; x < width; x++) {
 				// array slice the raw data into pixel-chunks
 				const start = x * chunkSize
 				const end = start + chunkSize
+				//
+				// "chunk" should hold floating point values between -1.0
+				// and 1.0
 				const chunk = workingData.slice(start, end)
 
-				// find and save the largest and smallest values in this chunk
-				positiveValues.push(Math.max(...chunk))
-				negativeValues.push(Math.min(...chunk))
-			}
-			// we are done with the raw data, let it go
-			rawAudioData = null
-
-			// the positiveValues and negativeValues values define the largest
-			// vertical space needed to display all the collected points.  Each
-			// pair of values: ( positiveValues[x], negativeValues[x] ) define a
-			// future vertical line in the display.
-			//
-			// max is the largest of the positiveValues and min is the smallest
-			// of the  negativeValues.  The difference between these two values
-			// is the longest possible vertical line that could exist in the
-			// incoming data.  These values will be scaled up to just fit in the
-			// available height of the canvas.
-			let max = Math.max(...positiveValues)
-			let min = Math.min(...negativeValues)
-
-			// Find the "Scaling Factor":
-
-			// let's say that the vertical height of the canvas is 100. The
-			// "origin" line will be at 50 (half the height). The values in
-			// positiveValues & negativeValues could be anything between
-			// 1.0 and -1.0. The values have to be "scaled" up/down to fit
-			// within the height limit while keeping "zero" on the center line.
-			//
-			// Find the largest absolute value of min & max. This value is
-			// "farthest" from the origin/zero so finding the value that will
-			// scale that number up/down to just fit inside its "side" of the
-			// origin becomes the scaling factor for all the other values.
-			//
-			// The scaling factor is then the largest value divided by half the
-			// height of the canvas.
-			let maxOriginOffset = Math.max(Math.abs(max), Math.abs(min))
-			let halfHeight = Math.floor(height / 2)
-			let scalingFactor = maxOriginOffset / halfHeight
-
-			// apply the scaling factor to all pixel-chunk values and build a
-			// rectangle whose width is 1 (pixel).  The top of the rectangle is
-			// the distance from the origin (half the canvas height) to the
-			// scaled "positive" value.  The bottom of the rectangle is the
-			// distance from the origin to the scaled "negative" value.
-			for (let x = 0; x < positiveValues.length; x++) {
-				let top = positiveValues[x]
-				if (top < this.audio_display_threshold) {
-					top = 0.0
-				}
-				let bottom = negativeValues[x]
-				if (bottom > this.audio_display_threshold * -1) {
-					bottom = 0.0
-				}
-				top /= scalingFactor
-				bottom /= scalingFactor
-
-				// "x" is the horizontal pixel position along the origin line.
-				// "y" is how high above the origin the rectangle will start.
-				// "width" is 1 pixel
-				// "height" is the distance between the top and bottom values
-				canvasCtx.fillRect(
-					x,
-					halfHeight - top,
-					1,
-					Math.max(1, top - bottom)
+				//
+				// find the high and low values in this chunk. There might
+				// be thousands of values in the chunk only draw a line
+				// between the largest and smallest.
+				let chunkMax = Number.MIN_VALUE
+				let chunkMin = Number.MAX_VALUE
+				chunk.forEach(
+					(value) => {
+						if (value > chunkMax) {
+							chunkMax = value
+						}
+						if (value < chunkMin) {
+							chunkMin = value
+						}
+					}
 				)
+
+				let cmx = chunkMax
+				if (cmx < this.audio_display_threshold
+				    && cmx > (this.audio_display_threshold * -1)) {
+					cmx = 0.0
+				}
+
+				let cmn = chunkMin
+				if (cmn < this.audio_display_threshold
+				    && cmn > (this.audio_display_threshold * -1)) {
+					cmn = 0.0
+				}
+
+				let top = cmx * scalingFactor // Scale the value to "1.0".
+				          * halfHeight        // Scale the "1" value to the
+				          //     space around the midline.
+				          + halfHeight        // Translate the value down to
+			                                  //     the midline.
+				let bottom = cmn * scalingFactor // Scale the value to "1.0".
+				             * halfHeight        // Scale the "1" value to the
+				             //     space around the
+				             //     midline.
+				             + halfHeight        // Translate the value down to
+			                                     //     the midline.
+
+				canvasCtx.beginPath()
+				canvasCtx.moveTo(x, top)
+				canvasCtx.lineTo(x, bottom)
+				canvasCtx.stroke()
 			}
 		} catch (e) {
 			throw new Error(e)
@@ -799,28 +838,35 @@ export class AudioControls {
 
 			new Blob(
 				this._chunks,
-				{'type': this._codec}
+				{'type': 'audio/wav'}
 			).arrayBuffer().then(
-				(buffer) => {
+				(arrayBuffer) => {
 					this._recordingContext.decodeAudioData(
-						buffer
+						arrayBuffer
 					).then(
-						(buf) => {
-							this.drawWaveform(buf)
+						(audioBuffer) => {
+							if (!audioBuffer) {
+								console.log(`undefined audioBuffer`)
+								return
+							}
+							this.drawWaveform(audioBuffer)
 						}
 					).catch(
 						(error) => {
+							console.log(error.message)
 							throw new Error(error.message)
 						}
 					)
 				}
 			).catch(
-				error => {
-					throw new Error(error)
+				(error) => {
+					console.log(error.message)
+					throw new Error(error.message)
 				}
 			)
 		} catch (e) {
-			throw new Error(`decodeAndDisplayAudio: ${e}`)
+			console.log(e)
+			throw new Error(e)
 		}
 	}
 }
