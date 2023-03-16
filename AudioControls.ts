@@ -295,7 +295,9 @@ export class AudioControls {
 		} catch {
 			let msg = `Browser Not Supported.`
 			console.log(msg)
-			throw new Error(msg)
+			document.dispatchEvent(new CustomEvent('AudioControls.Error', {
+				'detail': 'This browser does not support recording. Please try opening this page in a different browser or update this browser to the most recent version to continue'
+			}));
 		}
 
 		devices.then(
@@ -310,14 +312,23 @@ export class AudioControls {
 				if (!availableInputDevices.length) {
 					let msg = `No input devices found.`
 					console.log(msg)
-					throw new Error(msg)
+					document.dispatchEvent(new CustomEvent('AudioControls.Error', {
+						'detail': 'No input devices found. Please attach a microphone and reload the page'
+					}));
 				}
 
 				this.initializeRecording()
 					.catch(
 						(error) => {
 							console.log(error.message)
-							throw error.message
+							document.dispatchEvent(
+								new CustomEvent(
+									'AudioControls.Error',
+									{
+										'detail': error.message
+									}
+								)
+							)
 						}
 					)
 			}
