@@ -407,7 +407,15 @@ export class AudioControls {
 							(error) => {
 								let msg = `startRecording error: ${error.message}.`
 								console.log(msg)
-								throw new Error(msg)
+								document.dispatchEvent(
+									new CustomEvent(
+										'AudioControls.Error',
+										{
+											'detail': error.message
+										}
+									)
+								)
+								
 							}
 						)
 					}
