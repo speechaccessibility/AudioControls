@@ -411,7 +411,7 @@ export class AudioControls {
 									new CustomEvent(
 										'AudioControls.Error',
 										{
-											'detail': error.message
+											'detail': error.stack
 										}
 									)
 								)
