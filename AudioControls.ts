@@ -240,7 +240,7 @@ export class AudioControls {
 			console.log(msg)
 			throw new Error(msg)
 		}
-		this._maxRecordingTimeMsec = Math.trunc(maxRecordingTimeMsec)
+		this._maxRecordingTimeMsec = Math.ceil(maxRecordingTimeMsec)
 
 		if (typeof recordingSampleRateMsec != 'number') {
 			throw new Error(
@@ -249,7 +249,7 @@ export class AudioControls {
 			)
 		}
 		if (recordingSampleRateMsec) {
-			this._recordingSampleRateMsec = Math.trunc(recordingSampleRateMsec)
+			this._recordingSampleRateMsec = Math.ceil(recordingSampleRateMsec)
 			if (this._recordingSampleRateMsec === 0) {
 				let msg = `Recording Sample Rate value is zero.`
 				console.log(msg)
@@ -284,7 +284,7 @@ export class AudioControls {
 			console.log(msg)
 			throw new Error(msg)
 		}
-		this.audio_display_value_length = Math.trunc(audio_display_value_length)
+		this.audio_display_value_length = Math.ceil(audio_display_value_length)
 
 		//
 		// get list of available input devices. The "list" is probably not
@@ -295,9 +295,15 @@ export class AudioControls {
 		} catch {
 			let msg = `Browser Not Supported.`
 			console.log(msg)
-			document.dispatchEvent(new CustomEvent('AudioControls.Error', {
-				'detail': 'This browser does not support recording. Please try opening this page in a different browser or update this browser to the most recent version to continue'
-			}));
+			document.dispatchEvent(
+				new CustomEvent(
+					'AudioControls.Error',
+					{
+						'detail': 'This browser does not support recording. Please try opening this page in a different browser or update this browser to the most recent version to continue'
+					}
+				)
+			);
+			throw new Error(msg)
 		}
 
 		devices.then(
@@ -312,9 +318,15 @@ export class AudioControls {
 				if (!availableInputDevices.length) {
 					let msg = `No input devices found.`
 					console.log(msg)
-					document.dispatchEvent(new CustomEvent('AudioControls.Error', {
-						'detail': 'No input devices found. Please attach a microphone and reload the page'
-					}));
+					document.dispatchEvent(
+						new CustomEvent(
+							'AudioControls.Error',
+							{
+								'detail': 'No input devices found. Please attach a microphone and reload the page'
+							}
+						)
+					);
+					throw new Error(msg)
 				}
 
 				this.initializeRecording()
@@ -329,11 +341,13 @@ export class AudioControls {
 									}
 								)
 							)
+							throw new Error(error.message)
 						}
 					)
 			}
 		).catch(
 			(error) => {
+				console.log(error.message)
 				switch (error.message) {
 					case "Browser Not Supported.":
 						document.dispatchEvent(
@@ -356,6 +370,7 @@ export class AudioControls {
 						)
 						break
 				}
+				throw new Error(error.message)
 			}
 		)
 	}
@@ -366,14 +381,22 @@ export class AudioControls {
 	 *
 	 * @throws Exceptions are possible from navigator.mediaDevices.getUserMedia
 	 */
-	private async initializeRecording() {
+	private async initializeRecording(): Promise<void> {
 		try {
 			this._recordingContext = new (
 				AudioContext || webkitAudioContext
 			)()
 		} catch (e) {
 			console.log(e)
-			throw e
+			document.dispatchEvent(
+				new CustomEvent(
+					'AudioControls.Error',
+					{
+						'detail': `Trying to establish an AudioContext: ${e}`
+					}
+				)
+			);
+			throw new Error(e)
 		}
 
 		//
@@ -388,6 +411,14 @@ export class AudioControls {
 				if (!stream) {
 					let msg = `No MediaStream "stream" found.`
 					console.log(msg)
+					document.dispatchEvent(
+						new CustomEvent(
+							'AudioControls.Error',
+							{
+								'detail': `${msg}`
+							}
+						)
+					);
 					throw new Error(msg)
 				}
 				this._stream = stream;
@@ -415,7 +446,7 @@ export class AudioControls {
 										}
 									)
 								)
-								
+								throw new Error(msg)
 							}
 						)
 					}
@@ -437,6 +468,14 @@ export class AudioControls {
 		).catch(
 			(error) => {
 				console.log(error.message)
+				document.dispatchEvent(
+					new CustomEvent(
+						'AudioControls.Error',
+						{
+							'detail': `Trying to GetUserMedia: ${error.message}`
+						}
+					)
+				);
 				throw new Error(error.message);
 			}
 		);
@@ -455,7 +494,7 @@ export class AudioControls {
 	 *
 	 * @returns {Promise}
 	 */
-	private async startRecording(): Promise<unknown> {
+	private async startRecording(): Promise<void> {
 		return new Promise(
 			() => {
 				this._chunks = [];
@@ -463,6 +502,14 @@ export class AudioControls {
 				if (!this._codec) {
 					let msg = `Codec was not specified.`
 					console.log(msg)
+					document.dispatchEvent(
+						new CustomEvent(
+							'AudioControls.Error',
+							{
+								'detail': `startRecording: no codec: ${msg}`
+							}
+						)
+					);
 					throw new Error(msg)
 				}
 
@@ -475,6 +522,14 @@ export class AudioControls {
 					);
 				} catch (e) {
 					console.log(e)
+					document.dispatchEvent(
+						new CustomEvent(
+							'AudioControls.Error',
+							{
+								'detail': `MediaRecorder: ${e}`
+							}
+						)
+					);
 					throw e
 				}
 				this._mediaRecorder.addEventListener(
@@ -515,6 +570,14 @@ export class AudioControls {
 							this.decodeAndDisplayAudio().catch(
 								(error) => {
 									console.log(error.message)
+									document.dispatchEvent(
+										new CustomEvent(
+											'AudioControls.Error',
+											{
+												'detail': `decodeAndDisplayAudio: ${error.message}`
+											}
+										)
+									);
 									throw new Error(error.message)
 								}
 							)
@@ -558,6 +621,14 @@ export class AudioControls {
 			getTracks = this._stream.getTracks()
 		} catch (e) {
 			console.log(e)
+			document.dispatchEvent(
+				new CustomEvent(
+					'AudioControls.Error',
+					{
+						'detail': `getTracks: ${e}`
+					}
+				)
+			);
 			throw e
 		}
 
@@ -576,10 +647,11 @@ export class AudioControls {
 				}
 
 				recordingData['track information']
-					['per track information'].push({
-						                               'track number': index,
-						                               'track label' : track.label
-					                               }
+					['per track information'].push(
+					{
+						'track number': index,
+						'track label' : track.label
+					}
 				)
 
 				track.stop()
@@ -596,6 +668,14 @@ export class AudioControls {
 		if (this._chunks.length == 0) {
 			let msg = 'There are no audio chunks.'
 			console.log(msg)
+			document.dispatchEvent(
+				new CustomEvent(
+					'AudioControls.Error',
+					{
+						'detail': msg
+					}
+				)
+			);
 			throw new Error(msg)
 		}
 
@@ -670,6 +750,14 @@ export class AudioControls {
 				).catch(
 					(error) => {
 						console.log(error.message)
+						document.dispatchEvent(
+							new CustomEvent(
+								'AudioControls.Error',
+								{
+									'detail': `decodeAudioData: ${error.message}`
+								}
+							)
+						);
 						throw new Error(error.message)
 					}
 				)
@@ -677,6 +765,14 @@ export class AudioControls {
 		).catch(
 			error => {
 				console.log(error.message)
+				document.dispatchEvent(
+					new CustomEvent(
+						'AudioControls.Error',
+						{
+							'detail': `unsavedAudioBuffer: ${error.message}`
+						}
+					)
+				);
 				throw new Error(error.message)
 			}
 		)
@@ -843,6 +939,14 @@ export class AudioControls {
 				canvasCtx.stroke()
 			}
 		} catch (e) {
+			document.dispatchEvent(
+				new CustomEvent(
+					'AudioControls.Error',
+					{
+						'detail': `drawWaveform: ${e}`
+					}
+				)
+			);
 			throw new Error(e)
 		}
 	}
@@ -850,7 +954,7 @@ export class AudioControls {
 	/**
 	 * Convert the recorded Blob into audio
 	 */
-	private async decodeAndDisplayAudio() {
+	private async decodeAndDisplayAudio(): Promise<void> {
 		try {
 			// convert the blob audio data into an AudioContext and prepare to
 			// display a "waveform".
@@ -873,6 +977,14 @@ export class AudioControls {
 					).catch(
 						(error) => {
 							console.log(error.message)
+							document.dispatchEvent(
+								new CustomEvent(
+									'AudioControls.Error',
+									{
+										'detail': `decodeAndDisplayAudio: decodeAudioData: ${error.message}`
+									}
+								)
+							);
 							throw new Error(error.message)
 						}
 					)
@@ -880,11 +992,27 @@ export class AudioControls {
 			).catch(
 				(error) => {
 					console.log(error.message)
+					document.dispatchEvent(
+						new CustomEvent(
+							'AudioControls.Error',
+							{
+								'detail': `decodeAndDisplayAudio reading Blob: ${error.message}`
+							}
+						)
+					);
 					throw new Error(error.message)
 				}
 			)
 		} catch (e) {
 			console.log(e)
+			document.dispatchEvent(
+				new CustomEvent(
+					'AudioControls.Error',
+					{
+						'detail': `decodeAndDisplayAudio: ${e}`
+					}
+				)
+			);
 			throw new Error(e)
 		}
 	}
