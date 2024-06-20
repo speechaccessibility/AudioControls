@@ -1,0 +1,17 @@
+{
+  "files": [
+    "AudioControls.ts"
+  ],
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "noImplicitAny": false,
+    "noEmitOnError": true,
+    "removeComments": false,
+    "sourceMap": true,
+    "target": "es6",
+    "lib": [
+      "es2020",
+      "dom"
+    ]
+  }
+}
